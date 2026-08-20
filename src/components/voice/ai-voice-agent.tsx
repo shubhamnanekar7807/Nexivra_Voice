@@ -34,7 +34,7 @@ const PERSONAS: Persona[] = [
     lang: "en",
     langLabel: "English",
     voicePitch: 1.05,
-    voiceRate: 1.0,
+    voiceRate: 1.08,
   },
   {
     id: "alex",
@@ -45,7 +45,7 @@ const PERSONAS: Persona[] = [
     lang: "en",
     langLabel: "English",
     voicePitch: 0.95,
-    voiceRate: 1.02,
+    voiceRate: 1.1,
   },
 
   // Hindi (हिन्दी) Personas
@@ -57,8 +57,8 @@ const PERSONAS: Persona[] = [
     welcome: "नमस्ते! मैं रिया हूँ, नेक्सिव्रा टेक से आपकी एआई वॉयस असिस्टेंट। मैं आपकी क्या मदद कर सकती हूँ? आप माइक पर क्लिक करके मुझसे बोल सकते हैं!",
     lang: "hi",
     langLabel: "हिन्दी",
-    voicePitch: 1.1,
-    voiceRate: 0.95,
+    voicePitch: 1.05,
+    voiceRate: 1.06,
   },
   {
     id: "aryan",
@@ -69,7 +69,7 @@ const PERSONAS: Persona[] = [
     lang: "hi",
     langLabel: "हिन्दी",
     voicePitch: 0.95,
-    voiceRate: 0.98,
+    voiceRate: 1.08,
   },
 
   // Marathi (मराठी) Personas
@@ -81,8 +81,8 @@ const PERSONAS: Persona[] = [
     welcome: "नमस्कार! मी स्नेहा आहे, नेक्सिव्रा टेकची तुमची एआय व्हॉईस असिस्टंट. मी तुम्हाला कशी मदत करू शकते? तुम्ही माईक सुरू करून माझ्याशी थेट मराठीत बोलू शकता!",
     lang: "mr",
     langLabel: "मराठी",
-    voicePitch: 1.08,
-    voiceRate: 0.95,
+    voicePitch: 1.05,
+    voiceRate: 1.06,
   },
   {
     id: "rohan",
@@ -93,7 +93,7 @@ const PERSONAS: Persona[] = [
     lang: "mr",
     langLabel: "मराठी",
     voicePitch: 0.96,
-    voiceRate: 0.98,
+    voiceRate: 1.08,
   },
 ];
 
@@ -408,7 +408,7 @@ export function AiVoiceAgent({
         };
         setMessages((prev) => [...prev, agentMsg]);
         speakText(responseText, selectedLang, selectedPersona);
-      }, 450);
+      }, 40);
     },
     [generateAgentResponse, speakText, selectedLang, selectedPersona]
   );
