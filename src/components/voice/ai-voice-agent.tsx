@@ -54,7 +54,7 @@ const PERSONAS: Persona[] = [
     name: "रिया (Riya)",
     role: "कस्टमर सपोर्ट व बुकिंग एक्सपर्ट",
     avatar: "R",
-    welcome: "नमस्ते! मैं रिया हूँ, नेक्सिव्रा टेक से आपकी एआई वॉयस असिस्टेंट। मैं आपकी क्या मदद कर सकती हूँ? आप मुझसे बोलकर बात कर सकते हैं!",
+    welcome: "नमस्ते! मैं रिया हूँ, नेक्सिव्रा टेक से आपकी एआई वॉयस असिस्टेंट। मैं आपकी क्या मदद कर सकती हूँ? आप माइक पर क्लिक करके मुझसे बोल सकते हैं!",
     lang: "hi",
     langLabel: "हिन्दी",
     voicePitch: 1.1,
@@ -78,7 +78,7 @@ const PERSONAS: Persona[] = [
     name: "स्नेहा (Sneha)",
     role: "ग्राहक सेवा व अपॉइंटमेंट असिस्टंट",
     avatar: "S",
-    welcome: "नमस्कार! मी स्नेहा आहे, नेक्सिव्रा टेकची तुमची एआय व्हॉईस असिस्टंट. मी तुम्हाला कशी मदत करू शकते? तुम्ही माझ्याशी थेट मराठीत बोलू शकता!",
+    welcome: "नमस्कार! मी स्नेहा आहे, नेक्सिव्रा टेकची तुमची एआय व्हॉईस असिस्टंट. मी तुम्हाला कशी मदत करू शकते? तुम्ही माईक सुरू करून माझ्याशी थेट मराठीत बोलू शकता!",
     lang: "mr",
     langLabel: "मराठी",
     voicePitch: 1.08,
@@ -136,7 +136,8 @@ export function AiVoiceAgent({
   const [messages, setMessages] = useState<Message[]>([]);
   const [transcript, setTranscript] = useState<string>("");
   const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [supportedRecognition, setSupportedRecognition] = useState<boolean>(false);
+  const [supportedRecognition, setSupportedRecognition] = useState<boolean>(true);
+  const [systemVoices, setSystemVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -144,20 +145,151 @@ export function AiVoiceAgent({
 
   const currentLangPersonas = PERSONAS.filter((p) => p.lang === selectedLang);
 
+  // Auto-scroll message container
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, transcript]);
 
+  // Load and cache browser voices reliably (handles async onvoiceschanged in Chrome/Windows)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        setSupportedRecognition(true);
+    if (typeof window === "undefined") return;
+
+    const loadVoices = () => {
+      if ("speechSynthesis" in window) {
+        const available = window.speechSynthesis.getVoices();
+        if (available && available.length > 0) {
+          setSystemVoices(available);
+        }
       }
+    };
+
+    loadVoices();
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
     }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setSupportedRecognition(!!SpeechRecognition);
   }, []);
 
+  // Find optimal voice for current language
+  const getBestVoice = useCallback((lang: Language, voicesList: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
+    if (!voicesList || voicesList.length === 0) return null;
+
+    if (lang === "mr") {
+      // 1. Try Marathi voice
+      const mrVoice = voicesList.find((v) => v.lang.toLowerCase().startsWith("mr") || v.name.toLowerCase().includes("marathi"));
+      if (mrVoice) return mrVoice;
+
+      // 2. Fallback to Hindi voice (Devanagari phonetics match Marathi beautifully on Windows & Android)
+      const hiVoice = voicesList.find(
+        (v) =>
+          v.lang.toLowerCase().startsWith("hi") ||
+          v.name.toLowerCase().includes("hindi") ||
+          v.name.toLowerCase().includes("lekha") ||
+          v.name.toLowerCase().includes("swara") ||
+          v.name.toLowerCase().includes("hemant") ||
+          v.name.toLowerCase().includes("kalpana")
+      );
+      if (hiVoice) return hiVoice;
+
+      // 3. Fallback to Indian English
+      const inVoice = voicesList.find((v) => v.lang.toLowerCase().includes("in"));
+      if (inVoice) return inVoice;
+    }
+
+    if (lang === "hi") {
+      const hiVoice = voicesList.find(
+        (v) =>
+          v.lang.toLowerCase().startsWith("hi") ||
+          v.name.toLowerCase().includes("hindi") ||
+          v.name.toLowerCase().includes("lekha") ||
+          v.name.toLowerCase().includes("swara") ||
+          v.name.toLowerCase().includes("hemant") ||
+          v.name.toLowerCase().includes("kalpana")
+      );
+      if (hiVoice) return hiVoice;
+
+      const inVoice = voicesList.find((v) => v.lang.toLowerCase().includes("in"));
+      if (inVoice) return inVoice;
+    }
+
+    // Default English / Natural voice
+    const enVoice = voicesList.find(
+      (v) =>
+        v.lang.toLowerCase().startsWith("en") &&
+        (v.name.includes("Natural") ||
+          v.name.includes("Google") ||
+          v.name.includes("Samantha") ||
+          v.name.includes("India") ||
+          v.name.includes("Karen") ||
+          v.name.includes("Daniel") ||
+          v.name.includes("David"))
+    );
+    if (enVoice) return enVoice;
+
+    return voicesList[0] || null;
+  }, []);
+
+  // Multilingual Speech Synthesis Engine
+  const speakText = useCallback(
+    (text: string, lang: Language = selectedLang, persona: Persona = selectedPersona) => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window) || isMuted) {
+        setAgentState("idle");
+        return;
+      }
+
+      try {
+        window.speechSynthesis.cancel();
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+
+        setAgentState("speaking");
+
+        if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
+        audioIntervalRef.current = setInterval(() => {
+          setAudioLevel(Math.floor(Math.random() * 85) + 15);
+        }, 100);
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = persona.voiceRate;
+        utterance.pitch = persona.voicePitch;
+
+        const voices = systemVoices.length > 0 ? systemVoices : window.speechSynthesis.getVoices();
+        const bestVoice = getBestVoice(lang, voices);
+
+        if (bestVoice) {
+          utterance.voice = bestVoice;
+          utterance.lang = bestVoice.lang;
+        } else {
+          utterance.lang = lang === "mr" ? "hi-IN" : lang === "hi" ? "hi-IN" : "en-IN";
+        }
+
+        utterance.onend = () => {
+          clearInterval(audioIntervalRef.current);
+          setAudioLevel(0);
+          setAgentState("idle");
+        };
+
+        utterance.onerror = (e) => {
+          console.warn("Speech synthesis notice:", e);
+          clearInterval(audioIntervalRef.current);
+          setAudioLevel(0);
+          setAgentState("idle");
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn("Speech synthesis error:", err);
+        setAgentState("idle");
+      }
+    },
+    [selectedLang, selectedPersona, isMuted, systemVoices, getBestVoice]
+  );
+
+  // When language changes, update persona and speak welcome
   const handleLanguageChange = (lang: Language) => {
     setSelectedLang(lang);
     const newPersona = PERSONAS.find((p) => p.lang === lang) || PERSONAS[0];
@@ -175,120 +307,55 @@ export function AiVoiceAgent({
     }
   };
 
-  const speakText = useCallback(
-    (text: string, lang: Language = selectedLang, persona: Persona = selectedPersona) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        setAgentState("idle");
-        return;
-      }
-
-      window.speechSynthesis.cancel();
-      setAgentState("speaking");
-
-      if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
-      audioIntervalRef.current = setInterval(() => {
-        setAudioLevel(Math.floor(Math.random() * 85) + 15);
-      }, 100);
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = persona.voiceRate;
-      utterance.pitch = persona.voicePitch;
-
-      if (lang === "hi") {
-        utterance.lang = "hi-IN";
-      } else if (lang === "mr") {
-        utterance.lang = "mr-IN";
-      } else {
-        utterance.lang = "en-IN";
-      }
-
-      const voices = window.speechSynthesis.getVoices();
-      let matchedVoice = null;
-
-      if (lang === "hi") {
-        matchedVoice = voices.find((v) => v.lang.startsWith("hi") || v.name.includes("Hindi") || v.name.includes("Lekha") || v.name.includes("India"));
-      } else if (lang === "mr") {
-        matchedVoice = voices.find((v) => v.lang.startsWith("mr") || v.name.includes("Marathi") || v.lang.startsWith("hi") || v.name.includes("India"));
-      } else {
-        matchedVoice = voices.find(
-          (v) =>
-            v.lang.startsWith("en") &&
-            (v.name.includes("Natural") ||
-              v.name.includes("Google") ||
-              v.name.includes("Samantha") ||
-              v.name.includes("Karen") ||
-              v.name.includes("India") ||
-              v.name.includes("Daniel"))
-        );
-      }
-
-      if (matchedVoice) utterance.voice = matchedVoice;
-
-      utterance.onend = () => {
-        clearInterval(audioIntervalRef.current);
-        setAudioLevel(0);
-        setAgentState("idle");
-      };
-
-      utterance.onerror = () => {
-        clearInterval(audioIntervalRef.current);
-        setAudioLevel(0);
-        setAgentState("idle");
-      };
-
-      window.speechSynthesis.speak(utterance);
-    },
-    [selectedLang, selectedPersona]
-  );
-
+  // Dynamic Contextual Knowledge Generator for English, Hindi, and Marathi
   const generateAgentResponse = useCallback(
     (query: string, lang: Language): string => {
       const q = query.toLowerCase();
 
       // MARATHI (मराठी) RESPONSES
       if (lang === "mr") {
-        if (q.includes("सेवा") || q.includes("काम") || q.includes("सर्व्हिस") || q.includes("service")) {
-          return "नेक्सिव्रा टेक प्रामुख्याने ३ मुख्य सेवा प्रदान करते: १) २४/७ मानवासारखे बोलणारे एआय व्हॉईस एजंट्स, २) आधुनिक आणि वेगवान वेब अ‍ॅप्स, आणि ३) आकर्षक मोशन ग्राफिक्स व अ‍ॅनिमेशन डिझाईन!";
+        if (q.includes("सेवा") || q.includes("काम") || q.includes("सर्व्हिस") || q.includes("service") || q.includes("provide")) {
+          return "नेक्सिव्रा टेक प्रामुख्याने ३ मुख्य सेवा प्रदान करते: १) २४ तास मानवासारखे बोलणारे एआय व्हॉईस एजंट्स, २) वेगवान नेक्स्ट.जेएस वेब अ‍ॅप्स, आणि ३) आकर्षक मोशन ग्राफिक्स व अ‍ॅनिमेशन डिझाईन!";
         }
-        if (q.includes("अपॉइंटमेंट") || q.includes("बुक") || q.includes("appointment") || q.includes("schedule")) {
+        if (q.includes("अपॉइंटमेंट") || q.includes("बुक") || q.includes("appointment") || q.includes("schedule") || q.includes("वेळ")) {
           return "नक्कीच! मी तुमची अपॉइंटमेंट त्वरित बुक करू शकते. या गुरुवारी दुपारी २:०० वाजता किंवा शुक्रवारी सकाळी ११:०० वाजता कोणती वेळ तुम्हाला सोयीची आहे?";
         }
-        if (q.includes("मोशन") || q.includes("वेबसाईट") || q.includes("अ‍ॅनिमेशन") || q.includes("website")) {
+        if (q.includes("मोशन") || q.includes("वेबसाईट") || q.includes("अ‍ॅनिमेशन") || q.includes("website") || q.includes("web")) {
           return "आम्ही नेक्स्ट.जेएस आणि रिअ‍ॅक्ट वापरून हाय-स्पीड वेब अ‍ॅप्स आणि सुंदर मोशन अ‍ॅनिमेशन्स तयार करतो, ज्यामुळे तुमच्या ग्राहकांना सर्वोत्तम अनुभव मिळतो!";
         }
-        if (q.includes("स्पीड") || q.includes("लेटन्सी") || q.includes("फास्ट") || q.includes("latency")) {
+        if (q.includes("स्पीड") || q.includes("लेटन्सी") || q.includes("फास्ट") || q.includes("latency") || q.includes("वेळ")) {
           return "आमचे व्हॉईस एजंट्स ५०० मिलीसेकंदांपेक्षा कमी वेळेत उत्तर देतात! संभाषण अत्यंत नैसर्गिक आणि विनाअडथळा होते.";
         }
-        if (q.includes("संपर्क") || q.includes("ईमेल") || q.includes("contact") || q.includes("फोन")) {
+        if (q.includes("संपर्क") || q.includes("ईमेल") || q.includes("contact") || q.includes("फोन") || q.includes("कॉल")) {
           return "तुम्ही आमच्या टीमशी थेट hello@nexivratech.in वर ईमेल करू शकता किंवा आमच्या Contact पेजवरून प्रोजेक्ट रिक्वेस्ट पाठवू शकता. आम्ही २ तासांत उत्तर देतो!";
         }
-        if (q.includes("नमस्कार") || q.includes("हॅलो") || q.includes("हाय") || q.includes("hello")) {
+        if (q.includes("नमस्कार") || q.includes("हॅलो") || q.includes("हाय") || q.includes("hello") || q.includes("hi")) {
           return "नमस्कार! मी " + selectedPersona.name + " आहे. नेक्सिव्रा टेकमध्ये आपले स्वागत आहे. मी आपल्याला कशी मदत करू?";
         }
-        return "धन्यवाद! आपण विचारलेल्या \"" + query + "\" बद्दल: नेक्सिव्रा टेक एआय व्हॉईस सोल्यूशन्स, वेब डेव्हलपमेंट आणि मोशन डिझाईनमध्ये तज्ञ आहे. आपण अधिक माहितीसाठी आम्हाला कधीही संपर्क करू शकता!";
+        return "धन्यवाद! आपण विचारलेल्या प्रश्नाबद्दल: नेक्सिव्रा टेक एआय व्हॉईस सोल्यूशन्स, वेब डेव्हलपमेंट आणि मोशन डिझाईनमध्ये तज्ञ आहे. आपण hello@nexivratech.in वर अधिक माहिती विचारू शकता!";
       }
 
       // HINDI (हिन्दी) RESPONSES
       if (lang === "hi") {
-        if (q.includes("सेवा") || q.includes("काम") || q.includes("सर्विस") || q.includes("service")) {
+        if (q.includes("सेवा") || q.includes("काम") || q.includes("सर्विस") || q.includes("service") || q.includes("provide")) {
           return "नेक्सिव्रा टेक मुख्य रूप से ३ सेवाएं प्रदान करता है: १) २४ घंटे चलने वाले एआई वॉयस एजेंट्स, २) आधुनिक नेक्स्ट.जेएस वेब एप्लीकेशन्स, और ३) इंटरैक्टिव मोशन व 3D एनिमेशन डिज़ाइन!";
         }
-        if (q.includes("अपॉइंटमेंट") || q.includes("बुक") || q.includes("मीटिंग") || q.includes("appointment")) {
+        if (q.includes("अपॉइंटमेंट") || q.includes("बुक") || q.includes("मीटिंग") || q.includes("appointment") || q.includes("schedule")) {
           return "जी बिल्कुल! मैं आपकी अपॉइंटमेंट अभी शेड्यूल कर सकती हूँ। इस गुरुवार दोपहर २:०० बजे या शुक्रवार सुबह ११:०० बजे में से कौन सा समय आपके लिए सही रहेगा?";
         }
-        if (q.includes("वेबसाइट") || q.includes("एनिमेशन") || q.includes("मोशन") || q.includes("website")) {
+        if (q.includes("वेबसाइट") || q.includes("एनिमेशन") || q.includes("मोशन") || q.includes("website") || q.includes("web")) {
           return "हम आधुनिक नेक्स्ट.जेएस और रिऐक्ट पर आधारित अल्ट्रा-फास्ट वेबसाइट्स और आकर्षक मोशन एनिमेशन बनाते हैं जो आपके बिजनेस के कनवर्जन को बढ़ाते हैं।";
         }
         if (q.includes("स्पीड") || q.includes("लेटेंसी") || q.includes("फास्ट") || q.includes("latency")) {
           return "हमारे वॉयस एजेंट्स ५०० मिलीसेकंड से भी कम समय में रिस्पॉन्स देते हैं। बातचीत बिल्कुल सहज और प्राकृतिक होती है।";
         }
-        if (q.includes("संपर्क") || q.includes("ईमेल") || q.includes("contact") || q.includes("फोन")) {
+        if (q.includes("संपर्क") || q.includes("ईमेल") || q.includes("contact") || q.includes("फोन") || q.includes("कॉल")) {
           return "आप हमारी टीम से सीधे hello@nexivratech.in पर संपर्क कर सकते हैं या हमारे Contact पेज से प्रोजेक्ट रिक्वेस्ट भेज सकते हैं। हम २ घंटे में जवाब देते हैं!";
         }
-        if (q.includes("नमस्ते") || q.includes("नमस्कार") || q.includes("हेलो") || q.includes("हाय")) {
+        if (q.includes("नमस्ते") || q.includes("नमस्कार") || q.includes("हेलो") || q.includes("हाय") || q.includes("hello") || q.includes("hi")) {
           return "नमस्ते! मैं " + selectedPersona.name + " हूँ। नेक्सिव्रा टेक में आपका स्वागत है। मैं आपकी क्या मदद कर सकती हूँ?";
         }
-        return "धन्यवाद! \"" + query + "\" के बारे में: नेक्सिव्रा टेक आपके बिजनेस को वॉइस एआई, मॉडर्न वेब डेवलपमेंट और मोशन एनिमेशन के जरिए आगे बढ़ाता है।";
+        return "धन्यवाद! नेक्सिव्रा टेक आपके बिजनेस को वॉइस एआई, मॉडर्न वेब डेवलपमेंट और मोशन एनिमेशन के जरिए आगे बढ़ाता है। आप हमें hello@nexivratech.in पर लिख सकते हैं।";
       }
 
       // ENGLISH RESPONSES
@@ -352,7 +419,7 @@ export function AiVoiceAgent({
         window.speechSynthesis.cancel();
       }
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try { recognitionRef.current.stop(); } catch (_) {}
       }
       if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
       setIsCallActive(false);
@@ -380,25 +447,38 @@ export function AiVoiceAgent({
     }
   };
 
+  // Push to speak (Starts call automatically if not yet started)
   const startListening = () => {
     if (typeof window === "undefined") return;
+
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. You can click on the sample prompt chips below!");
+      alert("Microphone recognition is not supported in this browser. Please use Chrome/Edge or click on the prompt buttons below!");
       return;
     }
 
     try {
+      // Auto-start call session if not active
+      if (!isCallActive) {
+        setIsCallActive(true);
+      }
+
+      // Stop speech synthesis if speaking so mic doesn't hear the agent
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try { recognitionRef.current.abort(); } catch (_) {}
       }
 
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = true;
       
+      // Set language for speech recognition
       if (selectedLang === "mr") {
         recognition.lang = "mr-IN";
       } else if (selectedLang === "hi") {
@@ -424,8 +504,8 @@ export function AiVoiceAgent({
       };
 
       recognition.onerror = (event: any) => {
-        if (event.error !== "no-speech" && event.error !== "aborted") {
-          console.warn("Speech recognition notice:", event.error);
+        if (event.error === "not-allowed" || event.error === "permission-denied") {
+          alert("Microphone permission was denied. Please allow microphone access in your browser address bar.");
         }
         setAgentState("idle");
         setTranscript("");
@@ -441,7 +521,7 @@ export function AiVoiceAgent({
       recognitionRef.current = recognition;
       recognition.start();
     } catch (err) {
-      console.error("Mic initialization error:", err);
+      console.warn("Mic initialization notice:", err);
       setAgentState("idle");
     }
   };
@@ -462,7 +542,7 @@ export function AiVoiceAgent({
               <button
                 key={lang}
                 onClick={() => handleLanguageChange(lang)}
-                className={"rounded-lg px-3 py-1.5 text-xs font-bold transition-all " + (selectedLang === lang ? "bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-600 text-white shadow-md shadow-blue-500/50 scale-105" : "text-slate-300 hover:text-white hover:bg-white/[0.08]")}
+                className={"rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer " + (selectedLang === lang ? "bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-600 text-white shadow-md shadow-blue-500/50 scale-105" : "text-slate-300 hover:text-white hover:bg-white/[0.08]")}
               >
                 {labels[lang]}
               </button>
@@ -505,7 +585,7 @@ export function AiVoiceAgent({
                 }
               }}
               title={p.name + " - " + p.role}
-              className={"rounded-lg px-3 py-1 text-xs font-bold transition-all " + (selectedPersona.id === p.id ? "bg-gradient-to-r from-blue-600 to-fuchsia-600 text-white shadow-md shadow-blue-500/30" : "text-slate-300 hover:text-white hover:bg-white/[0.08]")}
+              className={"rounded-lg px-3 py-1 text-xs font-bold transition-all cursor-pointer " + (selectedPersona.id === p.id ? "bg-gradient-to-r from-blue-600 to-fuchsia-600 text-white shadow-md shadow-blue-500/30" : "text-slate-300 hover:text-white hover:bg-white/[0.08]")}
             >
               {p.name.split(" ")[0]}
             </button>
@@ -560,7 +640,7 @@ export function AiVoiceAgent({
           />
           <p className="text-xs font-bold tracking-wide text-cyan-200">
             {!isCallActive
-              ? selectedLang === "mr" ? "एआय एजंट तयार आहे - कॉल सुरू करण्यासाठी क्लिक करा" : selectedLang === "hi" ? "एआई एजेंट तैयार है - कॉल शुरू करने के लिए क्लिक करें" : "Agent Ready - Click to start live voice demo"
+              ? selectedLang === "mr" ? "एआय एजंट तयार आहे - कॉल किंवा माईक सुरू करा" : selectedLang === "hi" ? "एआई एजेंट तैयार है - कॉल या माइक शुरू करें" : "Agent Ready - Click Start Call or Push to Speak"
               : agentState === "speaking"
               ? selectedLang === "mr" ? "एजंट बोलत आहे..." : selectedLang === "hi" ? "एजेंट बोल रहा है..." : "Agent speaking..."
               : agentState === "listening"
@@ -598,10 +678,10 @@ export function AiVoiceAgent({
           <div className="grid h-full place-items-center py-6 text-center text-xs font-medium text-slate-400">
             <p>
               {selectedLang === "mr"
-                ? "एआय व्हॉईस एजंटशी बोलण्यासाठी \"Start Call\" वर क्लिक करा."
+                ? "एआय व्हॉईस एजंटशी बोलण्यासाठी \"Start Call\" किंवा \"माईक सुरू करा\" वर क्लिक करा."
                 : selectedLang === "hi"
-                ? "एआई वॉयस एजेंट से बात करने के लिए \"Start Call\" पर क्लिक करें।"
-                : "Click \"Start Call\" to begin a conversation with your AI Voice Agent."}
+                ? "एआई वॉयस एजेंट से बात करने के लिए \"Start Call\" या \"माइक शुरू करें\" पर क्लिक करें।"
+                : "Click \"Start Call\" or \"Push to Speak\" to speak with your AI Voice Agent."}
             </p>
           </div>
         ) : (
@@ -650,7 +730,7 @@ export function AiVoiceAgent({
                 if (!isCallActive) setIsCallActive(true);
                 handleUserMessage(prompt);
               }}
-              className="rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-1.5 text-xs font-medium text-slate-200 hover:border-cyan-400 hover:bg-cyan-500/15 hover:text-white transition-all text-left"
+              className="rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-1.5 text-xs font-medium text-slate-200 hover:border-cyan-400 hover:bg-cyan-500/15 hover:text-white transition-all text-left cursor-pointer"
             >
               💬 {prompt}
             </button>
@@ -664,11 +744,10 @@ export function AiVoiceAgent({
           {supportedRecognition && (
             <button
               onClick={startListening}
-              disabled={!isCallActive || agentState === "speaking"}
-              className={"inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all " + (agentState === "listening" ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-pulse" : "bg-white/[0.08] text-slate-200 hover:bg-white/[0.15] hover:text-white disabled:opacity-40")}
+              className={"inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer " + (agentState === "listening" ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-pulse scale-105" : "bg-gradient-to-r from-emerald-600/80 to-teal-600/80 text-white hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/20")}
             >
               <span>🎙️</span>
-              <span>{agentState === "listening" ? (selectedLang === "mr" ? "ऐकत आहे..." : selectedLang === "hi" ? "सुन रहे हैं..." : "Listening...") : (selectedLang === "mr" ? "माईक सुरू करा" : selectedLang === "hi" ? "माइक शुरू करें" : "Push to Speak")}</span>
+              <span>{agentState === "listening" ? (selectedLang === "mr" ? "ऐकत आहे..." : selectedLang === "hi" ? "सुन रहे हैं..." : "Listening...") : (selectedLang === "mr" ? "माईक सुरू करा (Speak)" : selectedLang === "hi" ? "माइक शुरू करें (Speak)" : "Push to Speak")}</span>
             </button>
           )}
 
@@ -679,7 +758,7 @@ export function AiVoiceAgent({
                 window.speechSynthesis.cancel();
               }
             }}
-            className="rounded-xl bg-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.15] transition"
+            className="rounded-xl bg-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.15] transition cursor-pointer"
             title={isMuted ? "Unmute Voice" : "Mute Voice"}
           >
             {isMuted ? "🔇 Audio Off" : "🔊 Audio On"}
@@ -688,7 +767,7 @@ export function AiVoiceAgent({
 
         <button
           onClick={toggleCall}
-          className={"inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-lg transition-all " + (isCallActive ? "bg-rose-600 hover:bg-rose-500 shadow-rose-600/40" : "bg-gradient-to-r from-blue-600 via-indigo-600 to-fuchsia-600 hover:opacity-95 shadow-blue-500/30 hover:scale-105 active:scale-95")}
+          className={"inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-lg transition-all cursor-pointer " + (isCallActive ? "bg-rose-600 hover:bg-rose-500 shadow-rose-600/40" : "bg-gradient-to-r from-blue-600 via-indigo-600 to-fuchsia-600 hover:opacity-95 shadow-blue-500/30 hover:scale-105 active:scale-95")}
         >
           <span>{isCallActive ? (selectedLang === "mr" ? "कॉल समाप्त करा" : selectedLang === "hi" ? "कॉल समाप्त करें" : "End Call") : (selectedLang === "mr" ? "व्हॉईस कॉल सुरू करा" : selectedLang === "hi" ? "वॉयस कॉल शुरू करें" : "Start Live Voice Call")}</span>
         </button>
