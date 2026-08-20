@@ -145,12 +145,10 @@ export function AiVoiceAgent({
 
   const currentLangPersonas = PERSONAS.filter((p) => p.lang === selectedLang);
 
-  // Auto-scroll message container
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, transcript]);
 
-  // Load and cache browser voices reliably (handles async onvoiceschanged in Chrome/Windows)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -173,16 +171,13 @@ export function AiVoiceAgent({
     setSupportedRecognition(!!SpeechRecognition);
   }, []);
 
-  // Find optimal voice for current language
   const getBestVoice = useCallback((lang: Language, voicesList: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
     if (!voicesList || voicesList.length === 0) return null;
 
     if (lang === "mr") {
-      // 1. Try Marathi voice
       const mrVoice = voicesList.find((v) => v.lang.toLowerCase().startsWith("mr") || v.name.toLowerCase().includes("marathi"));
       if (mrVoice) return mrVoice;
 
-      // 2. Fallback to Hindi voice (Devanagari phonetics match Marathi beautifully on Windows & Android)
       const hiVoice = voicesList.find(
         (v) =>
           v.lang.toLowerCase().startsWith("hi") ||
@@ -194,7 +189,6 @@ export function AiVoiceAgent({
       );
       if (hiVoice) return hiVoice;
 
-      // 3. Fallback to Indian English
       const inVoice = voicesList.find((v) => v.lang.toLowerCase().includes("in"));
       if (inVoice) return inVoice;
     }
@@ -215,7 +209,6 @@ export function AiVoiceAgent({
       if (inVoice) return inVoice;
     }
 
-    // Default English / Natural voice
     const enVoice = voicesList.find(
       (v) =>
         v.lang.toLowerCase().startsWith("en") &&
@@ -232,7 +225,6 @@ export function AiVoiceAgent({
     return voicesList[0] || null;
   }, []);
 
-  // Multilingual Speech Synthesis Engine
   const speakText = useCallback(
     (text: string, lang: Language = selectedLang, persona: Persona = selectedPersona) => {
       if (typeof window === "undefined" || !("speechSynthesis" in window) || isMuted) {
@@ -251,7 +243,7 @@ export function AiVoiceAgent({
         if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
         audioIntervalRef.current = setInterval(() => {
           setAudioLevel(Math.floor(Math.random() * 85) + 15);
-        }, 100);
+        }, 80);
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = persona.voiceRate;
@@ -289,7 +281,6 @@ export function AiVoiceAgent({
     [selectedLang, selectedPersona, isMuted, systemVoices, getBestVoice]
   );
 
-  // When language changes, update persona and speak welcome
   const handleLanguageChange = (lang: Language) => {
     setSelectedLang(lang);
     const newPersona = PERSONAS.find((p) => p.lang === lang) || PERSONAS[0];
@@ -307,7 +298,6 @@ export function AiVoiceAgent({
     }
   };
 
-  // Dynamic Contextual Knowledge Generator for English, Hindi, and Marathi
   const generateAgentResponse = useCallback(
     (query: string, lang: Language): string => {
       const q = query.toLowerCase();
@@ -447,7 +437,6 @@ export function AiVoiceAgent({
     }
   };
 
-  // Push to speak (Starts call automatically if not yet started)
   const startListening = () => {
     if (typeof window === "undefined") return;
 
@@ -460,12 +449,10 @@ export function AiVoiceAgent({
     }
 
     try {
-      // Auto-start call session if not active
       if (!isCallActive) {
         setIsCallActive(true);
       }
 
-      // Stop speech synthesis if speaking so mic doesn't hear the agent
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
@@ -478,7 +465,6 @@ export function AiVoiceAgent({
       recognition.continuous = false;
       recognition.interimResults = true;
       
-      // Set language for speech recognition
       if (selectedLang === "mr") {
         recognition.lang = "mr-IN";
       } else if (selectedLang === "hi") {
@@ -528,131 +514,138 @@ export function AiVoiceAgent({
 
   return (
     <div
-      className={"relative flex flex-col rounded-3xl border border-cyan-500/30 bg-gradient-to-b from-[#0b132b]/95 via-[#0e1838]/95 to-[#080d1f]/95 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-300 " + (compact ? "p-4" : "p-6 sm:p-8") + " " + className}
+      className={"relative flex flex-col rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-[#0e112a]/95 via-[#0a0c20]/95 to-[#070817]/95 text-white shadow-2xl backdrop-blur-2xl overflow-hidden transition-all duration-300 " + (compact ? "p-4" : "p-5 sm:p-6") + " " + className}
     >
-      {/* Language Selector Bar with Positive Vibrant Badges */}
-      <div className="flex items-center justify-between border-b border-white/15 pb-3 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Language / भाषा:</span>
-        </div>
-        <div className="flex items-center gap-1 bg-white/[0.06] p-1 rounded-xl border border-white/15">
+      {/* Top Bar: Language Switcher + Latency Tag */}
+      <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+        {/* Language Switcher Pills */}
+        <div className="flex items-center gap-1 bg-white/[0.06] p-1 rounded-full border border-white/10">
           {(["en", "hi", "mr"] as Language[]).map((lang) => {
             const labels = { en: "English", hi: "हिन्दी", mr: "मराठी" };
+            const isActive = selectedLang === lang;
             return (
               <button
                 key={lang}
                 onClick={() => handleLanguageChange(lang)}
-                className={"rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer " + (selectedLang === lang ? "bg-gradient-to-r from-cyan-500 via-blue-600 to-fuchsia-600 text-white shadow-md shadow-blue-500/50 scale-105" : "text-slate-300 hover:text-white hover:bg-white/[0.08]")}
+                className={"rounded-full px-3 py-0.5 text-[11px] font-semibold transition-all cursor-pointer " + (isActive ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-sm" : "text-zinc-400 hover:text-white hover:bg-white/[0.06]")}
               >
                 {labels[lang]}
               </button>
             );
           })}
         </div>
+
+        {/* Live Latency Tracker */}
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-0.5 text-[10px] font-medium text-cyan-300">
+          <span className="size-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span>&lt;500ms Latency</span>
+        </div>
       </div>
 
-      {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
-        <div className="flex items-center gap-3">
+      {/* Header: Persona Profile */}
+      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="flex items-center gap-2.5">
           <div className="relative">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 border border-cyan-400/40 text-base font-black text-white shadow-md shadow-cyan-500/30">
+            <span className="grid size-9 place-items-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 border border-blue-400/30 text-xs font-bold text-white shadow-md shadow-blue-500/30">
               {selectedPersona.avatar}
             </span>
             <span
-              className={"absolute -bottom-1 -right-1 size-3.5 rounded-full border-2 border-[#0b132b] " + (isCallActive ? (agentState === "speaking" ? "bg-cyan-400 animate-pulse" : agentState === "listening" ? "bg-emerald-400 animate-ping" : "bg-emerald-500") : "bg-slate-500")}
+              className={"absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#0e112a] " + (isCallActive ? (agentState === "speaking" ? "bg-cyan-400 animate-pulse" : agentState === "listening" ? "bg-emerald-400 animate-ping" : "bg-emerald-500") : "bg-zinc-600")}
             />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-white text-base">{selectedPersona.name}</h3>
-              <span className="rounded-full bg-cyan-500/15 px-2.5 py-0.5 text-[11px] font-bold text-cyan-300 border border-cyan-400/30">
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-semibold text-white text-xs sm:text-sm">{selectedPersona.name}</h3>
+              <span className="rounded-full border border-white/10 bg-white/[0.05] px-1.5 py-0.2 text-[9px] font-medium text-zinc-400">
                 {selectedPersona.langLabel}
               </span>
             </div>
-            <p className="text-xs text-slate-300">{selectedPersona.role}</p>
+            <p className="text-[11px] text-zinc-400 line-clamp-1">{selectedPersona.role}</p>
           </div>
         </div>
 
         {/* Persona Switcher for current language */}
-        <div className="flex items-center gap-1.5 bg-white/[0.06] p-1 rounded-xl border border-white/10">
-          {currentLangPersonas.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                setSelectedPersona(p);
-                if (isCallActive) {
-                  speakText(p.lang === "mr" ? "मी " + p.name + " आहे. बोला, कशी मदत करू?" : p.lang === "hi" ? "मैं " + p.name + " हूँ। बताइए, क्या सहायता करूँ?" : "Switched to " + p.name + ". How can I help?", selectedLang, p);
-                }
-              }}
-              title={p.name + " - " + p.role}
-              className={"rounded-lg px-3 py-1 text-xs font-bold transition-all cursor-pointer " + (selectedPersona.id === p.id ? "bg-gradient-to-r from-blue-600 to-fuchsia-600 text-white shadow-md shadow-blue-500/30" : "text-slate-300 hover:text-white hover:bg-white/[0.08]")}
-            >
-              {p.name.split(" ")[0]}
-            </button>
-          ))}
+        <div className="flex items-center gap-1 bg-white/[0.04] p-0.5 rounded-full border border-white/10">
+          {currentLangPersonas.map((p) => {
+            const isSelected = selectedPersona.id === p.id;
+            return (
+              <button
+                key={p.id}
+                onClick={() => {
+                  setSelectedPersona(p);
+                  if (isCallActive) {
+                    speakText(p.lang === "mr" ? "मी " + p.name + " आहे. बोला, कशी मदत करू?" : p.lang === "hi" ? "मैं " + p.name + " हूँ। बताइए, क्या सहायता करूँ?" : "Switched to " + p.name + ". How can I help?", selectedLang, p);
+                  }
+                }}
+                title={p.name + " - " + p.role}
+                className={"rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-all cursor-pointer " + (isSelected ? "bg-blue-600 text-white shadow-sm" : "text-zinc-400 hover:text-white")}
+              >
+                {p.name.split(" ")[0]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Voice Visualizer Orb & Waveform Center */}
-      <div className="relative my-6 flex flex-col items-center justify-center py-6">
-        {/* Vibrant Multi-Layer Glows */}
+      {/* Voice Visualizer Center (Glowing Orb) */}
+      <div className="relative my-4 flex flex-col items-center justify-center py-2">
+        {/* Glow */}
         <div
-          className={"absolute size-56 rounded-full blur-3xl transition-all duration-700 pointer-events-none " + (isCallActive ? (agentState === "speaking" ? "bg-gradient-to-tr from-cyan-500/40 via-blue-600/40 to-fuchsia-600/40 scale-125" : agentState === "listening" ? "bg-gradient-to-tr from-emerald-500/40 to-cyan-400/40 scale-110" : "bg-blue-600/30 scale-100") : "bg-cyan-600/20 scale-75")}
+          className={"absolute size-36 rounded-full blur-3xl transition-all duration-700 pointer-events-none " + (isCallActive ? (agentState === "speaking" ? "bg-blue-500/30 scale-125" : agentState === "listening" ? "bg-cyan-500/30 scale-110" : "bg-indigo-500/20 scale-100") : "bg-blue-600/10 scale-75")}
         />
 
-        {/* Central Voice Orb */}
+        {/* Central Orb */}
         <div className="relative grid place-items-center">
           {isCallActive && (
             <>
               <div
-                className={"absolute size-36 rounded-full border-2 border-cyan-400/40 transition-all duration-1000 " + (agentState === "speaking" || agentState === "listening" ? "animate-ping opacity-70" : "opacity-30")}
+                className={"absolute size-28 rounded-full border border-blue-400/30 transition-all duration-1000 " + (agentState === "speaking" || agentState === "listening" ? "animate-ping opacity-60" : "opacity-20")}
               />
               <div
-                className={"absolute size-44 rounded-full border border-fuchsia-400/30 transition-all duration-700 " + (agentState === "speaking" ? "scale-110 animate-pulse" : "scale-95")}
+                className={"absolute size-34 rounded-full border border-indigo-400/20 transition-all duration-700 " + (agentState === "speaking" ? "scale-110 animate-pulse" : "scale-95")}
               />
             </>
           )}
 
-          {/* Core Orb with Radiant Multi-Color Gradient */}
           <button
             onClick={toggleCall}
-            className={"relative size-26 rounded-full flex flex-col items-center justify-center shadow-xl transition-transform duration-300 hover:scale-105 active:scale-95 cursor-pointer " + (isCallActive ? (agentState === "speaking" ? "bg-gradient-to-tr from-cyan-400 via-blue-600 to-fuchsia-500 shadow-cyan-500/50" : agentState === "listening" ? "bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-500 shadow-emerald-500/50 animate-pulse" : "bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-blue-500/40") : "bg-gradient-to-tr from-blue-700 via-indigo-700 to-fuchsia-700 hover:from-cyan-500 hover:to-fuchsia-500 shadow-lg shadow-blue-600/30")}
+            className={"relative size-20 rounded-full flex flex-col items-center justify-center shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer " + (isCallActive ? (agentState === "speaking" ? "bg-gradient-to-tr from-cyan-400 via-blue-600 to-indigo-600 text-white shadow-blue-500/50" : agentState === "listening" ? "bg-gradient-to-tr from-emerald-400 to-cyan-500 text-black shadow-emerald-400/40 animate-pulse" : "bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-blue-500/30") : "bg-gradient-to-tr from-zinc-800 to-zinc-900 text-white border border-white/20 hover:border-blue-400/60")}
           >
-            <span className="text-2xl font-extrabold text-white">
+            <span className="text-lg font-bold">
               {isCallActive
                 ? agentState === "speaking"
                   ? "🔊"
                   : agentState === "listening"
                   ? "🎙️"
                   : "⚡"
-                : "📞"}
+                : "▶"}
             </span>
-            <span className="mt-1 text-[10px] font-extrabold text-white uppercase tracking-wider">
-              {isCallActive ? "Live Session" : "Start Call"}
+            <span className="mt-0.5 text-[8px] font-bold uppercase tracking-wider text-white/90">
+              {isCallActive ? "Live" : "Start Call"}
             </span>
           </button>
         </div>
 
         {/* Dynamic Status Text */}
-        <div className="mt-5 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-1.5">
           <span
-            className={"size-2.5 rounded-full " + (isCallActive ? (agentState === "speaking" ? "bg-cyan-400 animate-pulse" : agentState === "listening" ? "bg-emerald-400 animate-ping" : agentState === "thinking" ? "bg-amber-400 animate-bounce" : "bg-emerald-400") : "bg-slate-400")}
+            className={"size-2 rounded-full " + (isCallActive ? (agentState === "speaking" ? "bg-cyan-400 animate-pulse" : agentState === "listening" ? "bg-emerald-400 animate-ping" : agentState === "thinking" ? "bg-amber-400 animate-bounce" : "bg-emerald-400") : "bg-zinc-600")}
           />
-          <p className="text-xs font-bold tracking-wide text-cyan-200">
+          <p className="text-[11px] font-medium tracking-wide text-zinc-300">
             {!isCallActive
-              ? selectedLang === "mr" ? "एआय एजंट तयार आहे - कॉल किंवा माईक सुरू करा" : selectedLang === "hi" ? "एआई एजेंट तैयार है - कॉल या माइक शुरू करें" : "Agent Ready - Click Start Call or Push to Speak"
+              ? selectedLang === "mr" ? "एआय एजंट तयार आहे • कॉल सुरू करा" : selectedLang === "hi" ? "एआई एजेंट तैयार है • कॉल शुरू करें" : "Agent Ready • Click Start Call or Speak"
               : agentState === "speaking"
               ? selectedLang === "mr" ? "एजंट बोलत आहे..." : selectedLang === "hi" ? "एजेंट बोल रहा है..." : "Agent speaking..."
               : agentState === "listening"
               ? selectedLang === "mr" ? "तुमचा आवाज ऐकत आहे..." : selectedLang === "hi" ? "आपकी आवाज़ सुन रहे हैं..." : "Listening to your voice..."
               : agentState === "thinking"
               ? selectedLang === "mr" ? "उत्तर तयार करत आहे..." : selectedLang === "hi" ? "उत्तर तैयार कर रहे हैं..." : "Synthesizing response..."
-              : selectedLang === "mr" ? "कॉल कनेक्ट झाला - बोला किंवा खालील पर्याय निवडा" : selectedLang === "hi" ? "कॉल कनेक्ट हो गया - बोलिए या नीचे विकल्प चुनें" : "Call connected - Say something or pick a prompt"}
+              : selectedLang === "mr" ? "कॉल कनेक्ट झाला • बोला किंवा खालील पर्याय निवडा" : selectedLang === "hi" ? "कॉल कनेक्ट हो गया • बोलिए" : "Call connected • Speak or select prompt"}
           </p>
         </div>
 
-        {/* Equalizer Waveform Bars with Multi-color Gradient */}
-        <div className="mt-3 flex items-center gap-1 h-8">
+        {/* Equalizer Bars */}
+        <div className="mt-2 flex items-center gap-0.5 h-6">
           {[20, 45, 80, 55, 95, 70, 35, 90, 60, 40, 85, 50, 30].map((baseHeight, i) => {
             const dynamicHeight =
               agentState === "speaking"
@@ -665,7 +658,7 @@ export function AiVoiceAgent({
               <span
                 key={i}
                 style={{ height: dynamicHeight + "%" }}
-                className={"w-1 rounded-full transition-all duration-150 " + (agentState === "speaking" ? "bg-gradient-to-t from-cyan-400 via-blue-500 to-fuchsia-400" : agentState === "listening" ? "bg-emerald-400" : "bg-slate-700")}
+                className={"w-0.5 rounded-full transition-all duration-150 " + (agentState === "speaking" ? "bg-cyan-400" : agentState === "listening" ? "bg-emerald-400" : "bg-zinc-700")}
               />
             );
           })}
@@ -673,15 +666,15 @@ export function AiVoiceAgent({
       </div>
 
       {/* Live Transcript Stream */}
-      <div className="flex-1 min-h-[140px] max-h-[220px] overflow-y-auto rounded-2xl border border-white/10 bg-black/50 p-4 space-y-3">
+      <div className="flex-1 min-h-[110px] max-h-[160px] overflow-y-auto rounded-2xl border border-white/10 bg-black/60 p-3 space-y-2">
         {messages.length === 0 ? (
-          <div className="grid h-full place-items-center py-6 text-center text-xs font-medium text-slate-400">
+          <div className="grid h-full place-items-center py-4 text-center text-[11px] font-normal text-zinc-500">
             <p>
               {selectedLang === "mr"
-                ? "एआय व्हॉईस एजंटशी बोलण्यासाठी \"Start Call\" किंवा \"माईक सुरू करा\" वर क्लिक करा."
+                ? "एआय व्हॉईस एजंटशी बोलण्यासाठी \"Start Call\" वर क्लिक करा."
                 : selectedLang === "hi"
-                ? "एआई वॉयस एजेंट से बात करने के लिए \"Start Call\" या \"माइक शुरू करें\" पर क्लिक करें।"
-                : "Click \"Start Call\" or \"Push to Speak\" to speak with your AI Voice Agent."}
+                ? "एआई वॉयस एजेंट से बात करने के लिए \"Start Call\" पर क्लिक करें।"
+                : "Click \"Start Call\" or \"Push to Speak\" to begin voice interaction."}
             </p>
           </div>
         ) : (
@@ -690,14 +683,14 @@ export function AiVoiceAgent({
               key={m.id}
               className={"flex flex-col " + (m.sender === "user" ? "items-end" : "items-start")}
             >
-              <div className="flex items-center gap-1.5 mb-1 px-1">
-                <span className="text-[10px] text-cyan-300 font-bold">
+              <div className="flex items-center gap-1 mb-0.5 px-1">
+                <span className="text-[9px] text-zinc-400 font-medium">
                   {m.sender === "user" ? (selectedLang === "mr" ? "तुम्ही" : selectedLang === "hi" ? "आप" : "You") : selectedPersona.name}
                 </span>
-                <span className="text-[9px] text-slate-500">{m.timestamp}</span>
+                <span className="text-[8px] text-zinc-600">{m.timestamp}</span>
               </div>
               <div
-                className={"max-w-[88%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed font-medium " + (m.sender === "user" ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-none shadow-md shadow-blue-500/20" : "bg-slate-800/90 text-slate-100 border border-white/15 rounded-bl-none")}
+                className={"max-w-[90%] rounded-xl px-3 py-1.5 text-xs leading-relaxed " + (m.sender === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-zinc-800/90 text-zinc-200 border border-white/10 rounded-bl-none")}
               >
                 {m.text}
               </div>
@@ -706,10 +699,10 @@ export function AiVoiceAgent({
         )}
         {transcript && (
           <div className="flex flex-col items-end">
-            <span className="text-[10px] text-emerald-400 font-bold mb-1 px-1">
+            <span className="text-[9px] text-emerald-400 font-medium mb-0.5 px-1">
               {selectedLang === "mr" ? "तुम्ही (बोलत आहात...)" : selectedLang === "hi" ? "आप (बोल रहे हैं...)" : "You (Speaking...)"}
             </span>
-            <div className="max-w-[88%] rounded-2xl px-4 py-2.5 text-xs bg-blue-600/70 text-white italic animate-pulse">
+            <div className="max-w-[90%] rounded-xl px-3 py-1.5 text-xs bg-blue-600/70 text-white italic border border-blue-400/30 animate-pulse">
               {transcript}
             </div>
           </div>
@@ -717,20 +710,17 @@ export function AiVoiceAgent({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Interactive Quick Prompts for Selected Language */}
-      <div className="mt-4">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-cyan-300">
-          {selectedLang === "mr" ? "हे प्रश्न विचारून पहा:" : selectedLang === "hi" ? "ये प्रश्न पूछकर देखें:" : "Try asking these:"}
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {PROMPTS_BY_LANG[selectedLang].map((prompt) => (
+      {/* Interactive Quick Prompts */}
+      <div className="mt-3">
+        <div className="flex flex-wrap gap-1">
+          {PROMPTS_BY_LANG[selectedLang].slice(0, 3).map((prompt) => (
             <button
               key={prompt}
               onClick={() => {
                 if (!isCallActive) setIsCallActive(true);
                 handleUserMessage(prompt);
               }}
-              className="rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-1.5 text-xs font-medium text-slate-200 hover:border-cyan-400 hover:bg-cyan-500/15 hover:text-white transition-all text-left cursor-pointer"
+              className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-zinc-300 hover:border-blue-400/50 hover:bg-blue-600/10 hover:text-white transition-all text-left cursor-pointer truncate max-w-full"
             >
               💬 {prompt}
             </button>
@@ -738,16 +728,16 @@ export function AiVoiceAgent({
         </div>
       </div>
 
-      {/* Control Action Bar */}
-      <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
-        <div className="flex items-center gap-2">
+      {/* Action Bar */}
+      <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
+        <div className="flex items-center gap-1.5">
           {supportedRecognition && (
             <button
               onClick={startListening}
-              className={"inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer " + (agentState === "listening" ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 animate-pulse scale-105" : "bg-gradient-to-r from-emerald-600/80 to-teal-600/80 text-white hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/20")}
+              className={"inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer " + (agentState === "listening" ? "bg-emerald-400 text-black shadow-md shadow-emerald-400/30 animate-pulse" : "border border-blue-500/30 bg-blue-500/10 text-cyan-300 hover:bg-blue-500/20")}
             >
               <span>🎙️</span>
-              <span>{agentState === "listening" ? (selectedLang === "mr" ? "ऐकत आहे..." : selectedLang === "hi" ? "सुन रहे हैं..." : "Listening...") : (selectedLang === "mr" ? "माईक सुरू करा (Speak)" : selectedLang === "hi" ? "माइक शुरू करें (Speak)" : "Push to Speak")}</span>
+              <span>{agentState === "listening" ? "Listening..." : "Speak"}</span>
             </button>
           )}
 
@@ -758,18 +748,18 @@ export function AiVoiceAgent({
                 window.speechSynthesis.cancel();
               }
             }}
-            className="rounded-xl bg-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.15] transition cursor-pointer"
+            className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.08] transition cursor-pointer"
             title={isMuted ? "Unmute Voice" : "Mute Voice"}
           >
-            {isMuted ? "🔇 Audio Off" : "🔊 Audio On"}
+            {isMuted ? "🔇" : "🔊"}
           </button>
         </div>
 
         <button
           onClick={toggleCall}
-          className={"inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-lg transition-all cursor-pointer " + (isCallActive ? "bg-rose-600 hover:bg-rose-500 shadow-rose-600/40" : "bg-gradient-to-r from-blue-600 via-indigo-600 to-fuchsia-600 hover:opacity-95 shadow-blue-500/30 hover:scale-105 active:scale-95")}
+          className={"inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer " + (isCallActive ? "bg-rose-500 text-white hover:bg-rose-400" : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-500/30")}
         >
-          <span>{isCallActive ? (selectedLang === "mr" ? "कॉल समाप्त करा" : selectedLang === "hi" ? "कॉल समाप्त करें" : "End Call") : (selectedLang === "mr" ? "व्हॉईस कॉल सुरू करा" : selectedLang === "hi" ? "वॉयस कॉल शुरू करें" : "Start Live Voice Call")}</span>
+          <span>{isCallActive ? "End" : "Start Call"}</span>
         </button>
       </div>
     </div>

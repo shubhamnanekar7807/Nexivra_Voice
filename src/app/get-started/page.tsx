@@ -9,14 +9,14 @@ export const metadata = {
 
 export default function GetStartedPage() {
   return (
-    <div className="relative min-h-screen bg-[#09090b] text-zinc-100 selection:bg-violet-500 selection:text-white">
+    <div className="relative min-h-screen bg-[#080918] text-slate-100 selection:bg-blue-500 selection:text-white">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-zinc-950/75 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#080918]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Logo size="md" href="/" />
-          <div className="flex items-center gap-4 text-sm">
-            <Link href="/" className="text-zinc-400 hover:text-white transition">Home</Link>
-            <Link href="/contact" className="text-violet-400 font-semibold transition">Direct Contact</Link>
+          <Logo size="md" href="/" dark={true} />
+          <div className="flex items-center gap-4 text-sm font-semibold">
+            <Link href="/" className="text-slate-300 hover:text-white transition">Home</Link>
+            <Link href="/contact" className="text-cyan-400 font-bold transition">Direct Contact</Link>
           </div>
         </div>
       </header>
