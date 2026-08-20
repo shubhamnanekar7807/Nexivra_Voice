@@ -424,7 +424,9 @@ export function AiVoiceAgent({
       };
 
       recognition.onerror = (event: any) => {
-        console.warn("Speech recognition error:", event.error);
+        if (event.error !== "no-speech" && event.error !== "aborted") {
+          console.warn("Speech recognition notice:", event.error);
+        }
         setAgentState("idle");
         setTranscript("");
       };
