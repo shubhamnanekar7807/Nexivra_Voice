@@ -388,7 +388,7 @@ export function AiVoiceAgent({
       setTranscript("");
       setAgentState("thinking");
 
-      // Auto-persist appointment to Supabase DB if booking intent detected
+      // Auto-persist appointment to Supabase DB with conflict & double-booking prevention
       const isBooking = /appointment|schedule|book|वेळ|अपॉइंटमेंट|बुकिंग|मीटिंग/i.test(userText);
       if (isBooking) {
         fetch("/api/appointments", {
@@ -401,7 +401,28 @@ export function AiVoiceAgent({
             transcript: userText,
             source: "voice_agent",
           }),
-        }).catch((err) => console.warn("Supabase auto-booking write:", err));
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.alreadyBooked) {
+              const conflictMsgText =
+                selectedLang === "mr"
+                  ? "त्या वेळेसाठी आधीच एक अपॉइंटमेंट बुक आहे. परंतु आमच्याकडे शुक्रवारी सकाळी ११:०० वाजता वेळ उपलब्ध आहे. मी ती वेळ तुमच्यासाठी निश्चित करू का?"
+                  : selectedLang === "hi"
+                  ? "उस समय के लिए पहले से ही एक अपॉइंटमेंट बुक है। लेकिन हमारे पास शुक्रवार सुबह ११:०० बजे का स्लॉट उपलब्ध है। क्या मैं वह समय आपके लिए बुक कर दूँ?"
+                  : "That time slot is already reserved. However, we have an open slot this Friday at 11:00 AM. Would you like me to schedule that for you instead?";
+
+              const conflictMsg: Message = {
+                id: Math.random().toString(36).substring(7),
+                sender: "agent",
+                text: conflictMsgText,
+                timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              };
+              setMessages((prev) => [...prev, conflictMsg]);
+              speakText(conflictMsgText, selectedLang, selectedPersona);
+            }
+          })
+          .catch((err) => console.warn("Supabase auto-booking write:", err));
       }
 
       setTimeout(() => {

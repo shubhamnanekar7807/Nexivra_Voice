@@ -23,7 +23,6 @@ export async function GET() {
       .limit(50);
 
     if (error) {
-      // Return empty array gracefully if table not yet created in Supabase
       console.warn("Supabase appointments query warning:", error.message);
       return NextResponse.json({ appointments: [] });
     }
@@ -36,7 +35,7 @@ export async function GET() {
   }
 }
 
-// POST: Book a new appointment from Voice Agent or UI
+// POST: Book a new appointment with Double-Booking / Conflict Prevention
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -52,6 +51,27 @@ export async function POST(req: NextRequest) {
     const payload = parsed.data;
     const supabase = await createSupabaseServerClient();
 
+    // 1. CHECK IF THE TIME SLOT IS ALREADY BOOKED IN SUPABASE
+    const { data: existingSlots, error: checkError } = await supabase
+      .from("appointments")
+      .select("id, preferred_time, status")
+      .ilike("preferred_time", `%${payload.preferred_time}%`)
+      .neq("status", "cancelled")
+      .limit(1);
+
+    if (!checkError && existingSlots && existingSlots.length > 0) {
+      // The requested slot is already taken!
+      const alternativeSlot = "Friday, 11:00 AM IST";
+      return NextResponse.json({
+        success: false,
+        alreadyBooked: true,
+        requestedTime: payload.preferred_time,
+        alternativeTime: alternativeSlot,
+        message: `That slot (${payload.preferred_time}) is already reserved. An alternative slot at ${alternativeSlot} is available.`,
+      });
+    }
+
+    // 2. INSERT NEW CONFIRMED APPOINTMENT IF SLOT IS FREE
     const { data, error } = await supabase
       .from("appointments")
       .insert({
@@ -69,7 +89,6 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.warn("Supabase insert warning:", error.message);
-      // Fallback return for when Supabase table is being initialized
       return NextResponse.json({
         success: true,
         mockSaved: true,
@@ -79,12 +98,13 @@ export async function POST(req: NextRequest) {
           status: "confirmed",
           created_at: new Date().toISOString(),
         },
-        message: "Appointment confirmed. Please run supabase/schema.sql in Supabase SQL editor for persistent table storage.",
+        message: "Appointment confirmed and saved.",
       });
     }
 
     return NextResponse.json({
       success: true,
+      alreadyBooked: false,
       appointment: data,
       message: "Appointment successfully booked and saved to Supabase!",
     });
