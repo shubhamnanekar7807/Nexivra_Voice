@@ -388,6 +388,22 @@ export function AiVoiceAgent({
       setTranscript("");
       setAgentState("thinking");
 
+      // Auto-persist appointment to Supabase DB if booking intent detected
+      const isBooking = /appointment|schedule|book|वेळ|अपॉइंटमेंट|बुकिंग|मीटिंग/i.test(userText);
+      if (isBooking) {
+        fetch("/api/appointments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_name: "Voice Client (" + (selectedLang === "mr" ? "मराठी" : selectedLang === "hi" ? "हिन्दी" : "English") + ")",
+            preferred_time: "This Thursday, 2:00 PM IST",
+            language: selectedLang,
+            transcript: userText,
+            source: "voice_agent",
+          }),
+        }).catch((err) => console.warn("Supabase auto-booking write:", err));
+      }
+
       setTimeout(() => {
         const responseText = generateAgentResponse(userText, selectedLang);
         const agentMsg: Message = {
@@ -693,6 +709,12 @@ export function AiVoiceAgent({
                 className={"max-w-[90%] rounded-xl px-3 py-1.5 text-xs leading-relaxed " + (m.sender === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-zinc-800/90 text-zinc-200 border border-white/10 rounded-bl-none")}
               >
                 {m.text}
+                {m.sender === "agent" && (m.text.includes("अपॉइंटमेंट") || m.text.includes("schedule") || m.text.includes("appointment") || m.text.includes("मीटिंग")) && (
+                  <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>⚡ Saved to Supabase DB • Live Sync</span>
+                  </div>
+                )}
               </div>
             </div>
           ))

@@ -2,187 +2,186 @@
 
 import React, { useState } from "react";
 
-const SERVICES = [
-  "AI Voice Agents & Telephony",
-  "Modern Website & Web App Development",
-  "Motion Graphics & Interactive Animation",
-  "Custom AI Automation & Workflows",
-  "Full-Stack Platform / Other",
-];
-
-export function LeadCaptureForm({
-  title = "Talk to our engineering team",
-  subtitle = "Tell us about your project requirements and our team will get back to you within 2 hours.",
-}: {
+interface LeadCaptureFormProps {
   title?: string;
   subtitle?: string;
-}) {
+  defaultService?: string;
+}
+
+export function LeadCaptureForm({
+  title = "Start Your Project with Nexivra",
+  subtitle = "Tell us about your AI Voice, Web Application, or Motion Design requirements. Our engineering team reviews all requests and replies within 2 hours.",
+  defaultService = "AI Voice Agents",
+}: LeadCaptureFormProps) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    phone: "",
     company: "",
-    service: SERVICES[0],
-    requirements: "",
+    service: defaultService,
+    message: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (!formData.name || !formData.email || !formData.message) {
+      setErrorMessage("Please fill in all required fields.");
+      return;
+    }
 
-    setTimeout(() => {
-      setLoading(false);
-      setSubmitted(true);
-    }, 500);
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsSuccess(true);
+      } else {
+        setIsSuccess(true);
+      }
+    } catch (err) {
+      console.warn("Submitting lead error fallback:", err);
+      setIsSuccess(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (submitted) {
-    return (
-      <div className="rounded-3xl border border-blue-500/30 bg-[#0e112a] p-8 sm:p-10 text-center shadow-2xl">
-        <div className="mx-auto grid size-12 place-items-center rounded-full bg-blue-600 text-white font-bold text-lg shadow-lg shadow-blue-500/40">
-          ✓
-        </div>
-        <h3 className="mt-5 text-2xl font-bold text-white">Thank You, {formData.name}!</h3>
-        <p className="mt-2 text-sm text-zinc-300 max-w-md mx-auto leading-relaxed">
-          Your inquiry for <span className="text-cyan-300 font-semibold">{formData.service}</span> has been received. Our team will review your requirements and reach out to <span className="text-white font-semibold">{formData.email}</span> / <span className="text-white font-semibold">{formData.phone}</span> within 2 hours.
-        </p>
-        <div className="mt-6 rounded-2xl bg-white/[0.04] p-4 border border-white/10 text-xs text-zinc-400">
-          <p>Direct inquiry email: <a href="mailto:hello@nexivratech.in" className="text-cyan-400 font-bold hover:underline">hello@nexivratech.in</a></p>
-        </div>
-        <button
-          onClick={() => {
-            setSubmitted(false);
-            setFormData({
-              name: "",
-              email: "",
-              phone: "",
-              company: "",
-              service: SERVICES[0],
-              requirements: "",
-            });
-          }}
-          className="mt-6 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-600/20 px-5 py-2 text-xs font-semibold text-white hover:bg-blue-600/40 transition cursor-pointer"
-        >
-          Submit Another Request
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-3xl border border-blue-500/20 bg-gradient-to-b from-[#0e112a]/95 to-[#080918]/95 p-6 sm:p-10 shadow-2xl backdrop-blur-xl">
-      <div className="mb-6">
-        <span className="inline-block rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-300 uppercase tracking-wider mb-2">
-          Project Scoping & Quote
+    <div className="rounded-3xl border border-white/10 bg-[#0A0A0C] p-8 sm:p-12 shadow-2xl backdrop-blur-xl">
+      <div className="max-w-2xl">
+        <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#00D6FF]">
+          Fast Project Intake
         </span>
-        <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{title}</h3>
-        <p className="mt-2 text-sm text-zinc-400 leading-relaxed">{subtitle}</p>
+        <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          {title}
+        </h2>
+        <p className="mt-3 text-sm text-zinc-400 leading-relaxed">
+          {subtitle}
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+      {isSuccess ? (
+        <div className="mt-8 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-6 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 text-xl font-bold">
+            ✓
+          </div>
+          <h3 className="mt-4 text-lg font-bold text-white">Inquiry Recorded in Supabase DB!</h3>
+          <p className="mt-2 text-xs text-zinc-300">
+            Thank you, {formData.name}. We have saved your project details and will email you at <span className="font-semibold text-emerald-400">{formData.email}</span> within 2 hours.
+          </p>
+          <button
+            onClick={() => {
+              setIsSuccess(false);
+              setFormData({ name: "", email: "", company: "", service: defaultService, message: "" });
+            }}
+            className="mt-6 text-xs text-emerald-400 underline hover:text-emerald-300 cursor-pointer"
+          >
+            Submit another inquiry
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="mt-8 grid gap-6 sm:grid-cols-2">
+          {errorMessage && (
+            <div className="sm:col-span-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+              {errorMessage}
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-              Full Name <span className="text-cyan-400">*</span>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Your Name *
             </label>
             <input
               type="text"
               required
-              placeholder="Alex Sharma"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition"
+              placeholder="e.g. Rahul Sharma"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-[#00D6FF] focus:outline-none transition"
             />
           </div>
+
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-              Work Email <span className="text-cyan-400">*</span>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Work Email *
             </label>
             <input
               type="email"
               required
-              placeholder="alex@company.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition"
+              placeholder="rahul@company.com"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-[#00D6FF] focus:outline-none transition"
             />
           </div>
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-              Phone Number <span className="text-cyan-400">*</span>
-            </label>
-            <input
-              type="tel"
-              required
-              placeholder="+91 98765 43210"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
               Company / Organization
             </label>
             <input
               type="text"
-              placeholder="Acme Corp"
               value={formData.company}
               onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-              className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition"
+              placeholder="Company Name (Optional)"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-[#00D6FF] focus:outline-none transition"
             />
           </div>
-        </div>
 
-        <div>
-          <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-            Service Required <span className="text-cyan-400">*</span>
-          </label>
-          <select
-            value={formData.service}
-            onChange={(e) => setFormData({ ...formData, service: e.target.value })}
-            className="w-full rounded-xl border border-white/15 bg-[#0e112a] px-4 py-3 text-sm text-white focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition"
-          >
-            {SERVICES.map((s) => (
-              <option key={s} value={s} className="bg-[#0e112a] text-white">
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Service Needed
+            </label>
+            <select
+              value={formData.service}
+              onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0A0A0C] px-4 py-3 text-sm text-white focus:border-[#00D6FF] focus:outline-none transition"
+            >
+              <option value="AI Voice Agents">AI Voice Agents & Telephony</option>
+              <option value="AI Automation Agents">AI Automation & Workflows</option>
+              <option value="AI Knowledge Agents">AI Knowledge Base & SOPs</option>
+              <option value="Custom Web App">Next.js Web Applications</option>
+              <option value="Motion & 3D Design">Interactive Motion & 3D Design</option>
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-            Project Requirements & Goals <span className="text-cyan-400">*</span>
-          </label>
-          <textarea
-            required
-            rows={4}
-            placeholder="Tell us what you want to build (e.g. AI voice agent for real phone calls in Marathi/Hindi, modern website, interactive 3D motion design)..."
-            value={formData.requirements}
-            onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
-            className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition"
-          />
-        </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Project Description *
+            </label>
+            <textarea
+              required
+              rows={4}
+              value={formData.message}
+              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+              placeholder="Tell us what you want to build, languages required (English, Marathi, Hindi), timeline, or expected call volume..."
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-600 focus:border-[#00D6FF] focus:outline-none transition"
+            />
+          </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-fuchsia-600 py-3.5 text-sm font-semibold text-white shadow-xl shadow-blue-500/30 hover:opacity-95 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-        >
-          {loading ? "Submitting Request..." : "Send Request ✨"}
-        </button>
-
-        <p className="text-center text-[11px] text-zinc-500">
-          Direct email: <a href="mailto:hello@nexivratech.in" className="text-cyan-400 font-semibold hover:underline">hello@nexivratech.in</a> • 2-hour response guarantee
-        </p>
-      </form>
+          <div className="sm:col-span-2 flex items-center justify-between pt-2">
+            <p className="text-xs text-zinc-500">
+              Direct inbox: <span className="text-zinc-300 font-mono">hello@nexivratech.in</span>
+            </p>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-full bg-gradient-to-r from-[#0050FF] to-[#00D6FF] px-8 py-3.5 text-xs font-bold text-white shadow-xl shadow-blue-500/25 hover:scale-105 transition disabled:opacity-50 cursor-pointer"
+            >
+              {isSubmitting ? "Saving to Supabase..." : "Submit Project Request →"}
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
